@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Flowzen</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1.5' y='1.5' width='21' height='21' rx='6' fill='%2316171a'/%3E%3Cpath d='M6.5 15.5c3.5 0 3.5-7 7-7h4' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='6.5' cy='15.5' r='2' fill='%238090ff'/%3E%3Ccircle cx='17.5' cy='8.5' r='2' fill='%238090ff'/%3E%3C/svg%3E" />
+    <script>
+      // Apply the saved or system theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        var theme;
+        try { theme = localStorage.getItem('flowzen-theme'); } catch (error) {}
+        if (theme !== 'light' && theme !== 'dark') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
