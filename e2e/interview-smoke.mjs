@@ -26,11 +26,45 @@ try {
   check('A new user sees an honest empty state, with no fabricated scores', /No completed interviews yet/.test(dashboard) && !/Average score/.test(dashboard));
   await shot('01-dashboard-empty');
   const count = (await page.$$('.fz-card-grid .fz-ccard')).length;
-  check('The dashboard is a catalog of at least 12 problems with the shared hero, filters and results bar', count >= 12 && /Tell me more/.test(await text('.fz-hero')) && (await page.$$('.fz-filters .fz-facet')).length === 4 && /12 results/.test(await text('.fz-results-bar h2')), String(count));
+  check('The dashboard is a question bank of 50–100 problems with the shared hero, six filters and the results bar', count >= 50 && count <= 100 && /Tell me more/.test(await text('.fz-hero')) && (await page.$$('.fz-filters .fz-facet')).length === 6 && new RegExp(`${count} results`).test(await text('.fz-results-bar h2')), String(count));
+  const facetToggle = (title, label) => page.evaluate((title, label) => { const facet = [...document.querySelectorAll('.fz-facet')].find(entry => entry.querySelector('legend')?.textContent === title); const option = [...facet.querySelectorAll('label')].find(entry => entry.querySelector('.fz-facet__label')?.textContent === label); option?.querySelector('input')?.click(); return Boolean(option); }, title, label);
+  const cardTitles = () => page.$$eval('.fz-card-grid .fz-ccard h3', items => items.map(item => item.textContent));
+  // Evidence: company tags only where a checked source reports the question.
+  const practiceCards = await page.$$eval('.fz-ccard', cards => cards.filter(card => /Common practice question/.test(card.textContent)).length);
+  check('Cards show evidence status, and questions without evidence are labelled “Common practice question”', practiceCards > 0 && (await page.$$('.fz-ccard .fz-bank-company')).length > 0);
+  await facetToggle('Company (reported)', 'Stripe'); await wait(200);
+  const stripe = await cardTitles();
+  check('The company filter shows only questions a source reports for that company', stripe.includes('Payment Ledger') && stripe.includes('Rate Limiter') && !stripe.includes('Pastebin') && (await page.$$eval('.fz-ccard', cards => cards.every(card => /Stripe/.test(card.textContent)))), stripe.join(' | '));
+  await facetToggle('Company (reported)', 'Stripe'); await facetToggle('Company (reported)', 'Uber'); await wait(200);
+  check('A company without checked sources shows no results and an explanation, not invented tags', (await page.$$('.fz-card-grid .fz-ccard')).length === 0 && /does not mean they never ask/.test(await text('.fz-iv')));
+  await facetToggle('Company (reported)', 'Uber'); await facetToggle('Interview evidence', 'Common practice question'); await wait(200);
+  check('The evidence filter isolates common practice questions', (await page.$$eval('.fz-ccard', cards => cards.length > 0 && cards.every(card => /Common practice question/.test(card.textContent) && !card.querySelector('.fz-bank-company')))));
+  await facetToggle('Interview evidence', 'Common practice question');
+  await typeInto('.fz-filters input[type="search"]', 'meta crawler'); await wait(200);
+  check('Search matches titles and reporting companies together', JSON.stringify(await cardTitles()) === JSON.stringify(['Web Crawler']), (await cardTitles()).join(' | '));
+  await typeInto('.fz-filters input[type="search"]', 'pastebin'); await wait(200);
+  // Bookmarks persist across a reload, stored apart from interview history.
+  await page.evaluate(() => document.querySelector('.fz-ccard .fz-bank-bookmark').click()); await wait(300);
+  await page.reload({ waitUntil: 'networkidle0' }); await clickText('.fz-nav button', 'Interview'); await page.waitForSelector('.fz-card-grid'); await wait(300);
+  await facetToggle('Saved', 'Bookmarked only'); await wait(200);
+  const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('flowzen-question-bank-v1') ?? 'null'));
+  check('Bookmarks persist after a reload, can be filtered, and are stored apart from interview history', JSON.stringify(await cardTitles()) === JSON.stringify(['Pastebin']) && prefs?.bookmarks?.includes('pastebin') && !/pastebin/.test(await page.evaluate(() => localStorage.getItem('flowzen-interviews-v1') ?? '')));
+  await facetToggle('Saved', 'Bookmarked only'); await wait(150);
+  // A generated question has a full detail page and opens a working session.
+  await page.click('.fz-ccard button[aria-label="Open Payment Ledger"]');
+  await page.waitForSelector('.fz-iv-detail'); await wait(200);
+  const detail = await text('.fz-iv-detail');
+  check('A reported question’s page quotes the report, its confidence and the checked source', /Interview evidence/.test(detail) && /Design a ledger \(or bookkeeping\) service\./.test(detail) && /medium confidence/.test(detail) && await page.$eval('.fz-bank-source a', link => link.href.startsWith('https://www.aced.io/') && link.target === '_blank' && link.rel.includes('noopener')));
+  await page.evaluate(() => document.querySelector('.fz-bank-guide summary').click()); await wait(200);
+  const guide = await text('.fz-bank-guide');
+  check('The study guide covers requirements, scale, deep dives, follow-ups and the reference solution', ['Requirements', 'Scale assumptions', 'Deep dives', 'Follow-up questions', 'High-level architecture', 'Why it works', 'When an alternative is the better choice'].every(heading => guide.includes(heading)) && Boolean(await page.$('.fz-bank-guide .fz-diagram svg')));
+  await clickIn('.fz-iv-detail button', /Start practice/); await page.waitForSelector('.fz-iv-session'); await wait(300);
+  check('A question-bank problem opens a real practice session with its own statement and stages', /ledger/i.test(await text('.fz-iv-statement')) && (await page.$$('.fz-iv-stages button')).length === 8 && (await store()).drafts[0].definitionId === 'payment-ledger');
+  await clickIn('.fz-iv-side__actions button', /Discard/); await page.waitForSelector('.fz-catalog.fz-iv'); await wait(200);
   await typeInto('.fz-filters input[type="search"]', 'shortener'); await wait(200);
   check('Search filters the library', (await page.$$('.fz-card-grid .fz-ccard')).length === 1);
-  await page.evaluate(() => [...document.querySelectorAll('.fz-facet label')].find(label => label.querySelector('.fz-facet__label')?.textContent === 'Expert')?.querySelector('input')?.click()); await wait(150);
-  check('Filters combine (no match shows a clear state)', (await page.$$('.fz-card-grid .fz-ccard')).length === 0 && /No problems match/.test(await text('.fz-iv')));
+  await facetToggle('Difficulty', 'Expert'); await wait(150);
+  check('Filters combine (no match shows a clear state)', (await page.$$('.fz-card-grid .fz-ccard')).length === 0 && /No questions match/.test(await text('.fz-iv')));
   await clickIn('.fz-catalog__empty button', /Clear filters/); await wait(150);
   await shot('02-library');
   await page.click('.fz-ccard button[aria-label="Open URL Shortener"]'); await page.waitForSelector('.fz-iv-detail');

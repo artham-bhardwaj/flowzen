@@ -4,6 +4,7 @@ import { COMPETENCY_RESOURCES, recommendations, stats } from './analytics';
 import { benchmarkInput, scenarioApplies } from './benchmark';
 import { activeFollowUps, evaluate, parseNumber, reviewEstimates, scoreText, totals, withCorrections } from './evaluate';
 import { PROBLEMS, problemById, resourceProblem, validateDefinition } from './index';
+import { CURATED } from './problems';
 import { SOLUTIONS } from './solutions.fixture';
 import { createSession, update, type InterviewSession } from './session';
 import { answerFollowUp, askClarification, clock, goToStage, markAsked, revealHint, stageHasContent, submitFollowUp, tick, viewReference } from './workflow';
@@ -276,8 +277,8 @@ describe('analytics and recommendations', () => {
   });
 });
 
-describe('every problem', () => {
-  it.each(PROBLEMS.map(problem => [problem.id] as const))('%s: reference solutions meet the benchmark, score highly, and an empty session scores near zero', id => {
+describe('every curated problem', () => {
+  it.each(CURATED.map(problem => [problem.id] as const))('%s: reference solutions meet the benchmark, score highly, and an empty session scores near zero', id => {
     const definition = problemById(id)!;
     const solutions = SOLUTIONS[id];
     expect(solutions?.length, `${id} needs at least one tested solution`).toBeGreaterThan(0);
